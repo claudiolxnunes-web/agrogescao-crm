@@ -6,11 +6,11 @@ import {
 } from "../../drizzle/schema";
 import { eq, and, sql } from "drizzle-orm";
 import * as XLSX from "xlsx";
- 
+
 // ============================================================
 // Helpers
 // ============================================================
- 
+
 function parseDate(val: unknown): Date | null {
   if (!val) return null;
   if (val instanceof Date) return val;
@@ -28,24 +28,24 @@ function parseDate(val: unknown): Date | null {
   }
   return null;
 }
- 
+
 function toNum(val: unknown): number | null {
   if (val === null || val === undefined || val === "") return null;
   const n = Number(val);
   return isNaN(n) ? null : n;
 }
- 
+
 function toStr(val: unknown): string | null {
   if (val === null || val === undefined) return null;
   const s = String(val).trim();
   return s === "" ? null : s;
 }
- 
+
 function toInt(val: unknown): number | null {
   const n = toNum(val);
   return n === null ? null : Math.round(n);
 }
- 
+
 // Busca valor usando múltiplos nomes alternativos de coluna
 function col(row: Record<string, unknown>, ...names: string[]): unknown {
   for (const name of names) {
@@ -53,7 +53,7 @@ function col(row: Record<string, unknown>, ...names: string[]): unknown {
   }
   return null;
 }
- 
+
 // Determina se uma linha é pedido em aberto (sem NF ou tipo específico)
 function isOpenOrder(row: Record<string, unknown>): boolean {
   const nf = toStr(row["Nota Fiscal"]);
@@ -64,12 +64,12 @@ function isOpenOrder(row: Record<string, unknown>): boolean {
   if (tipo && (tipo.toLowerCase().includes("pedido") || tipo.toLowerCase().includes("aberto"))) return true;
   return false;
 }
- 
+
 // ============================================================
 // Router
 // ============================================================
 export const importFaturamentoRouter = router({
- 
+
   // Importar planilha de faturamento/vendas
   importFaturamento: protectedProcedure
     .input(z.object({
@@ -78,18 +78,18 @@ export const importFaturamentoRouter = router({
     }))
     .mutation(async ({ input }) => {
       const db = getDb();
- 
+
       // Decodificar base64 e ler Excel
       const buffer = Buffer.from(input.fileBase64, "base64");
       const workbook = XLSX.read(buffer, { type: "buffer", cellDates: false });
       const sheetName = workbook.SheetNames[0];
       const sheet = workbook.Sheets[sheetName];
       const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(sheet, { defval: null, raw: true });
- 
+
       if (!rows.length) {
         return { success: false, message: "Arquivo vazio ou sem dados" };
       }
- 
+
       // Contadores
       let clientsCreated = 0;
       let clientsSkipped = 0;
@@ -102,30 +102,30 @@ export const importFaturamentoRouter = router({
       let openOrdersCreated = 0;
       let openOrdersSkipped = 0;
       const errors: string[] = [];
- 
+
       // Cache em memória para evitar queries repetidas
       const clientCache = new Map<string, number>(); // clientCode -> id
       const repCache = new Map<string, number>(); // repCode -> id
       const productCache = new Map<string, number>(); // productCode -> id
- 
+
       // Pré-carregar clientes existentes com clientCode
       const existingClients = await db.select({ id: clients.id, clientCode: clients.clientCode }).from(clients);
       for (const c of existingClients) {
         if (c.clientCode) clientCache.set(c.clientCode, c.id);
       }
- 
+
       // Pré-carregar representantes existentes com repCode
       const existingReps = await db.select({ id: representatives.id, repCode: representatives.repCode }).from(representatives);
       for (const r of existingReps) {
         if (r.repCode) repCache.set(r.repCode, r.id);
       }
- 
+
       // Pré-carregar produtos existentes com productCode
       const existingProducts = await db.select({ id: products.id, productCode: products.productCode }).from(products);
       for (const p of existingProducts) {
         if (p.productCode) productCache.set(p.productCode, p.id);
       }
- 
+
       // Pré-carregar vendas existentes para controle de duplicidade
       // Chave: invoiceNumber + clientCode + productCode
       const existingInvoiceKeys = new Set<string>();
@@ -138,11 +138,11 @@ export const importFaturamentoRouter = router({
         const key = `${inv.invoiceNumber}|${inv.clientCode}|${inv.productCode}`;
         existingInvoiceKeys.add(key);
       }
- 
+
       // Processar cada linha
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
- 
+
         try {
           // Suporte a múltiplos formatos de coluna (data73 NF-style e data72 pedidos-style)
           const clientCode = toStr(col(row, "Cód. Cliente", "Cód Cliente", "COD_CLIENTE"));
@@ -153,7 +153,7 @@ export const importFaturamentoRouter = router({
           const productName = toStr(col(row, "Nome do Produto", "Produto", "NOME_PRODUTO"));
           const invoiceNumber = toStr(col(row, "Nota Fiscal", "NF", "NOTA_FISCAL"));
           const orderNumber   = toStr(col(row, "Pedido", "PEDIDO", "Pedido Green"));
- 
+
           // ---- 1. UPSERT CLIENTE ----
           if (clientCode && clientName) {
             if (!clientCache.has(clientCode)) {
@@ -165,7 +165,7 @@ export const importFaturamentoRouter = router({
               } else if (categoria.toLowerCase().includes("loja") || categoria.toLowerCase().includes("revenda") || categoria.toLowerCase().includes("cooperativa")) {
                 clientType = "revenda_agropecuaria";
               }
- 
+
               // Mapear UF para sigla de 2 letras
               const ufFull = toStr(row["UF"]) || "";
               const ufMap: Record<string, string> = {
@@ -179,7 +179,7 @@ export const importFaturamentoRouter = router({
                 "DISTRITO FEDERAL": "DF",
               };
               const stateUF = ufMap[ufFull.toUpperCase()] || (ufFull.length === 2 ? ufFull : null);
- 
+
               const inserted = await db.insert(clients).values({
                 clientCode,
                 name: clientName,
@@ -195,7 +195,7 @@ export const importFaturamentoRouter = router({
               clientsSkipped++;
             }
           }
- 
+
           // ---- 2. UPSERT REPRESENTANTE ----
           if (repCode && repName) {
             if (!repCache.has(repCode)) {
@@ -210,7 +210,7 @@ export const importFaturamentoRouter = router({
               repsSkipped++;
             }
           }
- 
+
           // ---- 3. UPSERT PRODUTO ----
           if (productCode && productName) {
             if (!productCache.has(productCode)) {
@@ -230,11 +230,11 @@ export const importFaturamentoRouter = router({
               productsSkipped++;
             }
           }
- 
+
           const clientId = clientCode ? clientCache.get(clientCode) || null : null;
           const repId = repCode ? repCache.get(repCode) || null : null;
           const productId = productCode ? productCache.get(productCode) || null : null;
- 
+
           // ---- 4. PEDIDO EM ABERTO ou VENDA ----
           if (isOpenOrder(row)) {
             // Pedido em aberto
@@ -329,14 +329,14 @@ export const importFaturamentoRouter = router({
               invoicesCreated++;
             }
           }
- 
+
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : String(err);
           errors.push(`Linha ${i + 2}: ${msg}`);
           if (errors.length >= 10) break; // Limitar erros reportados
         }
       }
- 
+
       return {
         success: true,
         summary: {
@@ -351,7 +351,7 @@ export const importFaturamentoRouter = router({
         message: `Importação concluída: ${clientsCreated} clientes, ${repsCreated} representantes, ${productsCreated} produtos, ${invoicesCreated} vendas, ${openOrdersCreated} pedidos em aberto importados.`,
       };
     }),
- 
+
   // Listar vendas/faturamento
   listInvoices: protectedProcedure
     .input(z.object({
@@ -366,25 +366,25 @@ export const importFaturamentoRouter = router({
       const page = input?.page || 1;
       const limit = input?.limit || 50;
       const offset = (page - 1) * limit;
- 
+
       const rows = await db.select().from(salesInvoices)
         .limit(limit)
         .offset(offset)
         .orderBy(salesInvoices.invoiceDate);
- 
+
       const countResult = await db.select({ count: sql<number>`count(*)` }).from(salesInvoices);
       const total = Number(countResult[0]?.count || 0);
- 
+
       return { rows, total, page, limit };
     }),
- 
+
   // Listar pedidos em aberto
   listOpenOrders: protectedProcedure
     .query(async () => {
       const db = getDb();
       return db.select().from(openOrders).orderBy(openOrders.orderDate);
     }),
- 
+
   // Listar produtos
   listProducts: protectedProcedure
     .query(async () => {
@@ -392,4 +392,3 @@ export const importFaturamentoRouter = router({
       return db.select().from(products).orderBy(products.name);
     }),
 });
- 

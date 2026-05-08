@@ -3,13 +3,13 @@ import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { salesInvoices, openOrders, products, representatives } from "../../drizzle/schema";
 import { eq, sql, and, gte, lte, like, desc, isNotNull } from "drizzle-orm";
- 
+
 // ============================================================
 // Router de Vendas / Faturamento
 // ============================================================
- 
+
 export const vendasRouter = router({
- 
+
   // ── Totais gerais com filtros ──────────────────────────────
   getTotals: protectedProcedure
     .input(z.object({
@@ -23,14 +23,14 @@ export const vendasRouter = router({
     .query(async ({ input }) => {
       const db = await getDb();
       const conditions: ReturnType<typeof and>[] = [];
- 
+
       if (input.mesAno) conditions.push(eq(salesInvoices.mesAno, input.mesAno));
       if (input.ano) conditions.push(eq(salesInvoices.ano, input.ano));
       if (input.repCode) conditions.push(eq(salesInvoices.repCode, input.repCode));
       if (input.tipoOperacao) conditions.push(eq(salesInvoices.tipoOperacao, input.tipoOperacao));
- 
+
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
- 
+
       const [totals] = await db
         .select({
           totalFaturamento: sql<number>`COALESCE(SUM(${salesInvoices.faturamentoRealizado}), 0)`,
@@ -46,10 +46,10 @@ export const vendasRouter = router({
         })
         .from(salesInvoices)
         .where(whereClause);
- 
+
       return totals;
     }),
- 
+
   // ── Vendas por representante ───────────────────────────────
   getByRepresentative: protectedProcedure
     .input(z.object({
@@ -63,13 +63,13 @@ export const vendasRouter = router({
     .query(async ({ input }) => {
       const db = await getDb();
       const conditions: ReturnType<typeof and>[] = [];
- 
+
       if (input.mesAno) conditions.push(eq(salesInvoices.mesAno, input.mesAno));
       if (input.ano) conditions.push(eq(salesInvoices.ano, input.ano));
       if (input.tipoOperacao) conditions.push(eq(salesInvoices.tipoOperacao, input.tipoOperacao));
- 
+
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
- 
+
       const rows = await db
         .select({
           repCode: salesInvoices.repCode,
@@ -90,10 +90,10 @@ export const vendasRouter = router({
         .groupBy(salesInvoices.repCode, salesInvoices.repName)
         .orderBy(desc(sql`SUM(${salesInvoices.faturamentoRealizado})`))
         .limit(input.limit);
- 
+
       return rows;
     }),
- 
+
   // ── Detalhamento de vendas por representante ───────────────
   getDetailByRep: protectedProcedure
     .input(z.object({
@@ -112,9 +112,9 @@ export const vendasRouter = router({
       if (input.mesAno) conditions.push(eq(salesInvoices.mesAno, input.mesAno));
       if (input.ano) conditions.push(eq(salesInvoices.ano, input.ano));
       if (input.tipoOperacao) conditions.push(eq(salesInvoices.tipoOperacao, input.tipoOperacao));
- 
+
       const whereClause = and(...conditions);
- 
+
       if (input.groupBy === "client") {
         return await db
           .select({
@@ -133,7 +133,7 @@ export const vendasRouter = router({
           .orderBy(desc(sql`SUM(${salesInvoices.faturamentoRealizado})`))
           .limit(input.limit);
       }
- 
+
       if (input.groupBy === "product") {
         return await db
           .select({
@@ -152,7 +152,7 @@ export const vendasRouter = router({
           .orderBy(desc(sql`SUM(${salesInvoices.faturamentoRealizado})`))
           .limit(input.limit);
       }
- 
+
       // groupBy === "invoice" — lista de NFs individuais
       return await db
         .select({
@@ -179,7 +179,7 @@ export const vendasRouter = router({
         .orderBy(desc(salesInvoices.invoiceDate))
         .limit(input.limit);
     }),
- 
+
   // ── Vendas por produto ─────────────────────────────────────
   getByProduct: protectedProcedure
     .input(z.object({
@@ -196,9 +196,9 @@ export const vendasRouter = router({
       if (input.ano) conditions.push(eq(salesInvoices.ano, input.ano));
       if (input.repCode) conditions.push(eq(salesInvoices.repCode, input.repCode));
       if (input.tipoOperacao) conditions.push(eq(salesInvoices.tipoOperacao, input.tipoOperacao));
- 
+
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
- 
+
       return await db
         .select({
           productCode: salesInvoices.productCode,
@@ -216,7 +216,7 @@ export const vendasRouter = router({
         .orderBy(desc(sql`SUM(${salesInvoices.faturamentoRealizado})`))
         .limit(input.limit);
     }),
- 
+
   // ── Evolução mensal (para gráfico de linha) ────────────────
   getMonthlyEvolution: protectedProcedure
     .input(z.object({
@@ -231,7 +231,7 @@ export const vendasRouter = router({
       ];
       if (input.repCode) conditions.push(eq(salesInvoices.repCode, input.repCode));
       if (input.tipoOperacao) conditions.push(eq(salesInvoices.tipoOperacao, input.tipoOperacao));
- 
+
       return await db
         .select({
           mesAno: salesInvoices.mesAno,
@@ -247,12 +247,12 @@ export const vendasRouter = router({
         .orderBy(salesInvoices.ano, salesInvoices.mesAno)
         .limit(input.limit);
     }),
- 
+
   // ── Lista de filtros disponíveis (meses, representantes, etc.) ──
   getFilterOptions: protectedProcedure
     .query(async () => {
       const db = await getDb();
- 
+
       const [meses, reps, tiposOp] = await Promise.all([
         db.selectDistinct({ mesAno: salesInvoices.mesAno, ano: salesInvoices.ano })
           .from(salesInvoices)
@@ -266,10 +266,10 @@ export const vendasRouter = router({
           .from(salesInvoices)
           .where(isNotNull(salesInvoices.tipoOperacao)),
       ]);
- 
+
       return { meses, reps, tiposOp };
     }),
- 
+
   // ── Vendas por UF (estado) ──────────────────────────────────
   getByUF: protectedProcedure
     .input(z.object({
@@ -288,7 +288,7 @@ export const vendasRouter = router({
       if (input.ano) conditions.push(eq(salesInvoices.ano, input.ano));
       if (input.repCode) conditions.push(eq(salesInvoices.repCode, input.repCode));
       if (input.tipoOperacao) conditions.push(eq(salesInvoices.tipoOperacao, input.tipoOperacao));
- 
+
       return await db
         .select({
           uf: salesInvoices.uf,
@@ -306,7 +306,7 @@ export const vendasRouter = router({
         .orderBy(desc(sql`SUM(${salesInvoices.faturamentoRealizado})`))
         .limit(input.limit);
     }),
- 
+
   // ── Filtros: adicionar UFs disponíveis ────────────────────────
   getUFOptions: protectedProcedure
     .query(async () => {
@@ -318,7 +318,87 @@ export const vendasRouter = router({
         .orderBy(salesInvoices.uf);
       return ufs.map(r => r.uf).filter(Boolean) as string[];
     }),
- 
+
+  // ── Faturamento por cliente ────────────────────────────────
+  getByClient: protectedProcedure
+    .input(z.object({
+      mesAno: z.string().optional(),
+      ano: z.number().optional(),
+      repCode: z.string().optional(),
+      uf: z.string().optional(),
+      limit: z.number().default(200),
+    }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      const conditions: ReturnType<typeof and>[] = [];
+      if (input.mesAno) conditions.push(eq(salesInvoices.mesAno, input.mesAno));
+      if (input.ano)    conditions.push(eq(salesInvoices.ano, input.ano));
+      if (input.repCode) conditions.push(eq(salesInvoices.repCode, input.repCode));
+      if (input.uf)     conditions.push(eq(salesInvoices.uf, input.uf));
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      return await db
+        .select({
+          clientCode: salesInvoices.clientCode,
+          clientName: salesInvoices.clientName,
+          repCode:    salesInvoices.repCode,
+          repName:    salesInvoices.repName,
+          uf:         salesInvoices.uf,
+          municipio:  salesInvoices.municipio,
+          regiao:     salesInvoices.regiao,
+          totalFaturamento: sql<number>`COALESCE(SUM(${salesInvoices.faturamentoRealizado}), 0)`,
+          totalQtdSacos:    sql<number>`COALESCE(SUM(${salesInvoices.qtdSacos}), 0)`,
+          totalNFs:         sql<number>`COUNT(DISTINCT ${salesInvoices.invoiceNumber})`,
+          totalProdutos:    sql<number>`COUNT(DISTINCT ${salesInvoices.productCode})`,
+          mediaMb:          sql<number>`COALESCE(AVG(${salesInvoices.mbCbPct}), 0)`,
+        })
+        .from(salesInvoices)
+        .where(whereClause)
+        .groupBy(
+          salesInvoices.clientCode, salesInvoices.clientName,
+          salesInvoices.repCode, salesInvoices.repName,
+          salesInvoices.uf, salesInvoices.municipio, salesInvoices.regiao
+        )
+        .orderBy(desc(sql`SUM(${salesInvoices.faturamentoRealizado})`))
+        .limit(input.limit);
+    }),
+
+  // ── Faturamento por cidade ─────────────────────────────────
+  getByCity: protectedProcedure
+    .input(z.object({
+      mesAno: z.string().optional(),
+      ano: z.number().optional(),
+      repCode: z.string().optional(),
+      uf: z.string().optional(),
+      limit: z.number().default(100),
+    }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      const conditions: ReturnType<typeof and>[] = [
+        isNotNull(salesInvoices.municipio),
+      ];
+      if (input.mesAno)  conditions.push(eq(salesInvoices.mesAno, input.mesAno));
+      if (input.ano)     conditions.push(eq(salesInvoices.ano, input.ano));
+      if (input.repCode) conditions.push(eq(salesInvoices.repCode, input.repCode));
+      if (input.uf)      conditions.push(eq(salesInvoices.uf, input.uf));
+
+      return await db
+        .select({
+          municipio:  salesInvoices.municipio,
+          uf:         salesInvoices.uf,
+          regiao:     salesInvoices.regiao,
+          totalFaturamento: sql<number>`COALESCE(SUM(${salesInvoices.faturamentoRealizado}), 0)`,
+          totalQtdSacos:    sql<number>`COALESCE(SUM(${salesInvoices.qtdSacos}), 0)`,
+          totalNFs:         sql<number>`COUNT(DISTINCT ${salesInvoices.invoiceNumber})`,
+          totalClientes:    sql<number>`COUNT(DISTINCT ${salesInvoices.clientCode})`,
+        })
+        .from(salesInvoices)
+        .where(and(...conditions))
+        .groupBy(salesInvoices.municipio, salesInvoices.uf, salesInvoices.regiao)
+        .orderBy(desc(sql`SUM(${salesInvoices.faturamentoRealizado})`))
+        .limit(input.limit);
+    }),
+
   // ── Pedidos em aberto ──────────────────────────────────────
   getOpenOrders: protectedProcedure
     .input(z.object({
@@ -329,9 +409,9 @@ export const vendasRouter = router({
       const db = await getDb();
       const conditions: ReturnType<typeof and>[] = [];
       if (input.repCode) conditions.push(eq(openOrders.repCode, input.repCode));
- 
+
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
- 
+
       const rows = await db
         .select({
           id: openOrders.id,
@@ -364,7 +444,7 @@ export const vendasRouter = router({
         .where(whereClause)
         .orderBy(desc(openOrders.createdAt))
         .limit(input.limit);
- 
+
       // Preenche campos nulos com os valores das tabelas relacionadas
       return rows.map(r => ({
         ...r,
@@ -375,4 +455,3 @@ export const vendasRouter = router({
       }));
     }),
 });
- 

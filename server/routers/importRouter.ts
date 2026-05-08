@@ -13,11 +13,11 @@ import { invokeLLM } from "../_core/llm";
 import { getDb } from "../db";
 import { clients, regions, representatives, purchases } from "../../drizzle/schema";
 import { eq, ilike } from "drizzle-orm";
- 
+
 // ============================================================
 // FIELD DEFINITIONS — what can be mapped from a spreadsheet
 // ============================================================
- 
+
 const CLIENT_FIELDS = [
   { field: "name",               label: "Nome / Razão Social",                           required: true },
   { field: "type",               label: "Tipo (fazenda_ruminantes | fabrica_racao | revenda_agropecuaria)" },
@@ -49,7 +49,7 @@ const CLIENT_FIELDS = [
   { field: "monthlySalesVolume", label: "Volume Mensal de Vendas" },
   { field: "finalClientsCount",  label: "Número de Clientes Finais" },
 ];
- 
+
 const PURCHASES_FIELDS = [
   { field: "clientName",         label: "Nome do Cliente",                               required: true },
   { field: "representativeName", label: "Nome do Representante",                          required: true },
@@ -61,23 +61,23 @@ const PURCHASES_FIELDS = [
   { field: "invoiceNumber",      label: "Número da Nota Fiscal / NF" },
   { field: "notes",              label: "Observações" },
 ];
- 
+
 const BATCH_SIZE = 100;
- 
+
 // ============================================================
 // SMART FALLBACK MAPPING — string-based heuristics
 // ============================================================
- 
+
 function buildFallbackMapping(headers: string[], importType: "clients" | "purchases"): Record<string, string | null> {
   const mapping: Record<string, string | null> = {};
- 
+
   for (const header of headers) {
     const h = header.toLowerCase()
       .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // remove accents
       .trim();
- 
+
     let matched: string | null = null;
- 
+
     if (importType === "clients") {
       if (h.match(/^nome$|razao.?social|nome.?empresa|empresa|cliente/)) matched = "name";
       else if (h.match(/contato|responsavel|atendente/)) matched = "contactName";
@@ -120,17 +120,17 @@ function buildFallbackMapping(headers: string[], importType: "clients" | "purcha
       else if (h.match(/nota.?fiscal|nf\b|nfe|invoice/)) matched = "invoiceNumber";
       else if (h.match(/obs|observ|nota\b|comentario/)) matched = "notes";
     }
- 
+
     mapping[header] = matched;
   }
- 
+
   return mapping;
 }
- 
+
 // ============================================================
 // ROUTER
 // ============================================================
- 
+
 export const importRouter = router({
   /**
    * Step 1: Parse the Excel/CSV file, read headers from first row,
@@ -152,56 +152,56 @@ export const importRouter = router({
       } catch {
         throw new Error("Não foi possível ler o arquivo. Certifique-se de que é um arquivo .xlsx, .xls ou .csv válido.");
       }
- 
+
       const sheetName = workbook.SheetNames[0];
       if (!sheetName) throw new Error("O arquivo não contém planilhas.");
- 
+
       const sheet = workbook.Sheets[sheetName];
       // header:1 → first row becomes the header array
       const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" }) as any[][];
- 
+
       if (rawData.length < 1) {
         throw new Error("O arquivo está vazio.");
       }
- 
+
       // First row = headers
       const headers = (rawData[0] as any[]).map(h => String(h ?? "").trim()).filter(h => h !== "");
- 
+
       if (headers.length === 0) {
         throw new Error("A primeira linha do arquivo não contém cabeçalhos reconhecíveis.");
       }
- 
+
       const dataRows = rawData.slice(1).filter(row =>
         row.some((cell: any) => String(cell ?? "").trim() !== "")
       );
- 
+
       const sampleRows = dataRows.slice(0, 5).map(row =>
         headers.reduce((obj, h, i) => ({ ...obj, [h]: String(row[i] ?? "").trim() }), {} as Record<string, string>)
       );
       const totalRows = dataRows.length;
- 
+
       const fields = input.importType === "purchases" ? PURCHASES_FIELDS : CLIENT_FIELDS;
- 
+
       // --- Try AI mapping first ---
       let mapping: Record<string, string | null> = {};
       let confidence = "low";
       let aiNotes = "";
- 
+
       const fieldDescriptions = fields
         .map(f => `"${f.field}": ${f.label}${f.required ? " (OBRIGATÓRIO)" : ""}`)
         .join("\n");
- 
+
       const prompt = `Você é um assistente especializado em CRM agropecuário. Analise os cabeçalhos de uma planilha e mapeie cada coluna para o campo correto do sistema.
- 
+
 CAMPOS DISPONÍVEIS NO SISTEMA:
 ${fieldDescriptions}
- 
+
 CABEÇALHOS DA PLANILHA (${headers.length} colunas):
 ${headers.map((h, i) => `${i}: "${h}"`).join("\n")}
- 
+
 EXEMPLO DE DADOS (primeiras linhas):
 ${JSON.stringify(sampleRows.slice(0, 3), null, 2)}
- 
+
 Retorne um JSON com o mapeamento:
 {
   "mapping": {
@@ -210,13 +210,13 @@ Retorne um JSON com o mapeamento:
   "confidence": "high|medium|low",
   "notes": "breve descrição do mapeamento"
 }
- 
+
 REGRAS IMPORTANTES:
 - Use null para colunas que não correspondem a nenhum campo do sistema (NÃO gere erro, apenas ignore)
 - Seja inteligente com variações: "Qtd Animais" → "animalCount", "Tel. Celular" → "phone", "Dt. Venda" → "purchaseDate"
 - Inclua TODOS os cabeçalhos no mapping, mesmo os que serão null
 - O campo "name" (Nome) é obrigatório para clientes`;
- 
+
       try {
         const response = await invokeLLM({
           messages: [
@@ -224,7 +224,7 @@ REGRAS IMPORTANTES:
             { role: "user", content: prompt },
           ],
         });
- 
+
         const rawContent = response.choices?.[0]?.message?.content;
         const content = typeof rawContent === "string" ? rawContent : JSON.stringify(rawContent);
         if (content) {
@@ -232,7 +232,7 @@ REGRAS IMPORTANTES:
           mapping = parsed.mapping || {};
           confidence = parsed.confidence || "low";
           aiNotes = parsed.notes || "";
- 
+
           // Ensure all headers are present in mapping (fill missing with null)
           for (const h of headers) {
             if (!(h in mapping)) mapping[h] = null;
@@ -244,7 +244,7 @@ REGRAS IMPORTANTES:
         confidence = "medium";
         aiNotes = "Mapeamento automático por correspondência de títulos. Verifique e ajuste se necessário.";
       }
- 
+
       return {
         headers,
         sampleRows,
@@ -255,7 +255,7 @@ REGRAS IMPORTANTES:
         availableFields: fields,
       };
     }),
- 
+
   /**
    * Step 2a: Import clients using the confirmed mapping.
    * Columns mapped to null are silently ignored.
@@ -271,18 +271,18 @@ REGRAS IMPORTANTES:
     }))
     .mutation(async ({ input }) => {
       const db = getDb();
- 
+
       const buffer = Buffer.from(input.fileBase64, "base64");
       const workbook = XLSX.read(buffer, { type: "buffer" });
       const sheetName = workbook.SheetNames[0];
       const sheet = workbook.Sheets[sheetName];
       const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" }) as any[][];
- 
+
       const headers = (rawData[0] as any[]).map(h => String(h ?? "").trim());
       const dataRows = rawData.slice(1).filter(row =>
         row.some((cell: any) => String(cell ?? "").trim() !== "")
       );
- 
+
       // Build field → column-index lookup (only for mapped, non-null entries)
       const fieldToIdx: Record<string, number> = {};
       for (const [header, field] of Object.entries(input.mapping)) {
@@ -291,12 +291,12 @@ REGRAS IMPORTANTES:
           if (idx >= 0) fieldToIdx[field] = idx;
         }
       }
- 
+
       const getValue = (row: any[], field: string): string => {
         const idx = fieldToIdx[field];
         return idx !== undefined ? String(row[idx] ?? "").trim() : "";
       };
- 
+
       const parseNum = (v: string): number | undefined => {
         const n = parseFloat(v.replace(/[^\d.,]/g, "").replace(",", "."));
         return isNaN(n) ? undefined : n;
@@ -305,11 +305,11 @@ REGRAS IMPORTANTES:
         const n = parseInt(v.replace(/[^\d]/g, ""), 10);
         return isNaN(n) ? undefined : n;
       };
- 
+
       let imported = 0;
       let skipped = 0;
       const errors: string[] = [];
- 
+
       // Pré-carregar registros existentes para upsert (atualiza se já existir)
       const existingClientByCode = new Map<string, number>(); // clientCode → id
       const existingClientByName = new Map<string, number>(); // name lower → id
@@ -318,24 +318,24 @@ REGRAS IMPORTANTES:
         if (ec.clientCode) existingClientByCode.set(ec.clientCode.trim(), ec.id);
         if (ec.name) existingClientByName.set(ec.name.trim().toLowerCase(), ec.id);
       }
- 
+
       for (let batchStart = 0; batchStart < dataRows.length; batchStart += BATCH_SIZE) {
         const batch = dataRows.slice(batchStart, Math.min(batchStart + BATCH_SIZE, dataRows.length));
- 
+
         for (let i = 0; i < batch.length; i++) {
           const row = batch[i];
           const rowNum = batchStart + i + 2; // +2: 1-based + header row
- 
+
           const name = getValue(row, "name");
           if (!name) { skipped++; continue; }
- 
+
           // Verificar se já existe para fazer upsert (atualiza em vez de pular)
           const rowClientCode = getValue(row, "clientCode")?.trim();
           const existingId = rowClientCode
             ? existingClientByCode.get(rowClientCode)
             : existingClientByName.get(name.trim().toLowerCase());
           const isUpdate = !!existingId;
- 
+
           // Determine client type
           let clientType: "fazenda_ruminantes" | "fabrica_racao" | "revenda_agropecuaria" =
             input.defaultType || "fazenda_ruminantes";
@@ -343,13 +343,13 @@ REGRAS IMPORTANTES:
           if (typeRaw.match(/fazenda|ruminante/)) clientType = "fazenda_ruminantes";
           else if (typeRaw.match(/fabrica|fábrica|racao|ração/)) clientType = "fabrica_racao";
           else if (typeRaw.match(/revenda/)) clientType = "revenda_agropecuaria";
- 
+
           // Normalize status
           let status: "active" | "inactive" | "prospect" = "active";
           const statusRaw = getValue(row, "status").toLowerCase();
           if (statusRaw.match(/inativo|inactive/)) status = "inactive";
           else if (statusRaw.match(/prospect|potencial/)) status = "prospect";
- 
+
           try {
             const clientData = {
               name,
@@ -384,7 +384,7 @@ REGRAS IMPORTANTES:
               monthlySalesVolume: parseNum(getValue(row, "monthlySalesVolume")),
               finalClientsCount:  parseIntVal(getValue(row, "finalClientsCount")),
             } as any;
- 
+
             if (isUpdate) {
               // UPSERT: atualiza registro existente
               await db.update(clients).set({ ...clientData, updatedAt: new Date() }).where(eq(clients.id, existingId!));
@@ -400,10 +400,10 @@ REGRAS IMPORTANTES:
           }
         }
       }
- 
+
       return { imported, skipped, errors: errors.slice(0, 20), total: dataRows.length };
     }),
- 
+
   /**
    * Step 2b: Import purchases (individual sale records) using the confirmed mapping.
    * Columns mapped to null are silently ignored.
@@ -416,18 +416,18 @@ REGRAS IMPORTANTES:
     }))
     .mutation(async ({ input }) => {
       const db = getDb();
- 
+
       const buffer = Buffer.from(input.fileBase64, "base64");
       const workbook = XLSX.read(buffer, { type: "buffer" });
       const sheetName = workbook.SheetNames[0];
       const sheet = workbook.Sheets[sheetName];
       const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" }) as any[][];
- 
+
       const headers = (rawData[0] as any[]).map(h => String(h ?? "").trim());
       const dataRows = rawData.slice(1).filter(row =>
         row.some((cell: any) => String(cell ?? "").trim() !== "")
       );
- 
+
       const fieldToIdx: Record<string, number> = {};
       for (const [header, field] of Object.entries(input.mapping)) {
         if (field) {
@@ -435,17 +435,17 @@ REGRAS IMPORTANTES:
           if (idx >= 0) fieldToIdx[field] = idx;
         }
       }
- 
+
       const getValue = (row: any[], field: string): string => {
         const idx = fieldToIdx[field];
         return idx !== undefined ? String(row[idx] ?? "").trim() : "";
       };
- 
+
       const parseNum = (v: string): number => {
         const n = parseFloat(v.replace(/[^\d.,]/g, "").replace(",", "."));
         return isNaN(n) ? 0 : n;
       };
- 
+
       const parseDate = (dateStr: string): Date => {
         const s = dateStr.trim();
         if (!s) return new Date();
@@ -465,31 +465,31 @@ REGRAS IMPORTANTES:
         }
         return new Date(s);
       };
- 
+
       let imported = 0;
       let skipped = 0;
       const errors: string[] = [];
- 
+
       for (let batchStart = 0; batchStart < dataRows.length; batchStart += BATCH_SIZE) {
         const batch = dataRows.slice(batchStart, Math.min(batchStart + BATCH_SIZE, dataRows.length));
- 
+
         for (let i = 0; i < batch.length; i++) {
           const row = batch[i];
           const rowNum = batchStart + i + 2;
- 
+
           const clientName   = getValue(row, "clientName");
           const repName      = getValue(row, "representativeName");
           const product      = getValue(row, "product");
           const quantityStr  = getValue(row, "quantity");
           const valueStr     = getValue(row, "value");
           const dateStr      = getValue(row, "purchaseDate");
- 
+
           // Skip rows missing required fields (no error — just skip silently)
           if (!clientName || !repName || !product || !quantityStr || !valueStr) {
             skipped++;
             continue;
           }
- 
+
           try {
             // Resolve client by name (partial match)
             const clientResult = await db
@@ -498,7 +498,7 @@ REGRAS IMPORTANTES:
               .where(ilike(clients.name, `%${clientName}%`))
               .limit(1);
             const clientId = clientResult[0]?.id;
- 
+
             // Resolve representative by name (partial match)
             const repResult = await db
               .select({ id: representatives.id })
@@ -506,7 +506,7 @@ REGRAS IMPORTANTES:
               .where(ilike(representatives.name, `%${repName}%`))
               .limit(1);
             const repId = repResult[0]?.id;
- 
+
             if (!clientId) {
               errors.push(`Linha ${rowNum}: Cliente "${clientName}" não encontrado no sistema`);
               skipped++;
@@ -517,17 +517,17 @@ REGRAS IMPORTANTES:
               skipped++;
               continue;
             }
- 
+
             const quantity = parseNum(quantityStr);
             const value    = parseNum(valueStr);
             const purchaseDate = parseDate(dateStr);
- 
+
             if (value <= 0) {
               errors.push(`Linha ${rowNum}: Valor inválido "${valueStr}"`);
               skipped++;
               continue;
             }
- 
+
             await db.insert(purchases).values({
               clientId,
               representativeId: repId,
@@ -546,10 +546,10 @@ REGRAS IMPORTANTES:
           }
         }
       }
- 
+
       return { imported, skipped, errors: errors.slice(0, 20), total: dataRows.length };
     }),
- 
+
   // Keep backward-compat alias so existing frontend calls still work
   importSalesHistory: protectedProcedure
     .input(z.object({
@@ -569,14 +569,14 @@ REGRAS IMPORTANTES:
       const dataRows = rawData.slice(1).filter(row =>
         row.some((cell: any) => String(cell ?? "").trim() !== "")
       );
- 
+
       // Remap legacy field names to new ones
       const remapped: Record<string, string | null> = {};
       for (const [header, field] of Object.entries(input.mapping)) {
         if (field === "saleDate") remapped[header] = "purchaseDate";
         else remapped[header] = field;
       }
- 
+
       const fieldToIdx: Record<string, number> = {};
       for (const [header, field] of Object.entries(remapped)) {
         if (field) {
@@ -584,7 +584,7 @@ REGRAS IMPORTANTES:
           if (idx >= 0) fieldToIdx[field] = idx;
         }
       }
- 
+
       const getValue = (row: any[], field: string): string => {
         const idx = fieldToIdx[field];
         return idx !== undefined ? String(row[idx] ?? "").trim() : "";
@@ -602,10 +602,10 @@ REGRAS IMPORTANTES:
         }
         return new Date(s);
       };
- 
+
       let imported = 0, skipped = 0;
       const errors: string[] = [];
- 
+
       for (let batchStart = 0; batchStart < dataRows.length; batchStart += BATCH_SIZE) {
         const batch = dataRows.slice(batchStart, Math.min(batchStart + BATCH_SIZE, dataRows.length));
         for (let i = 0; i < batch.length; i++) {
@@ -642,4 +642,3 @@ REGRAS IMPORTANTES:
       return { imported, skipped, errors: errors.slice(0, 20), total: dataRows.length };
     }),
 });
- 

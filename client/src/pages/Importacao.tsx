@@ -56,6 +56,15 @@ const TEMPLATES = [
     importType: "clients" as const,
   },
   {
+    name: "Representantes",
+    description: "Importar representantes comerciais — usa código como chave (upsert)",
+    fields: ["codigo", "nome", "email", "telefone", "estado", "regiao"],
+    icon: Users,
+    color: "text-purple-600",
+    bg: "bg-purple-50 dark:bg-purple-900/20",
+    importType: "representatives" as const,
+  },
+  {
     name: "Histórico de Vendas",
     description: "Importar dados de vendas realizadas",
     fields: ["cliente", "representante", "produto", "quantidade", "valor", "data", "região"],
@@ -63,6 +72,15 @@ const TEMPLATES = [
     color: "text-blue-600",
     bg: "bg-blue-50 dark:bg-blue-900/20",
     importType: "purchases" as const,
+  },
+  {
+    name: "Pedidos em Aberto",
+    description: "Importar arquivo de tracking de pedidos (data__72_ formato)",
+    fields: ["pedido", "cliente", "produto", "representante", "valor", "volume", "status"],
+    icon: ClipboardList,
+    color: "text-orange-600",
+    bg: "bg-orange-50 dark:bg-orange-900/20",
+    importType: "openOrders" as const,
   },
 ];
 
@@ -91,11 +109,12 @@ export default function Importacao() {
   const analyzeFileMutation = trpc.import.analyzeFile.useMutation();
   const importClientsMutation = trpc.import.importClients.useMutation();
   const importPurchasesMutation = trpc.import.importPurchases.useMutation();
+  const importRepsMutation = trpc.import.importRepresentatives?.useMutation?.() ?? importClientsMutation;
   const clearDatabaseMutation = trpc.admin.clearDatabase.useMutation();
   const importFaturamentoMutation = trpc.importFaturamento.importFaturamento.useMutation();
 
   const template = TEMPLATES.find(t => t.name === selectedType);
-  const importType = (template?.importType || "clients") as "clients" | "purchases";
+  const importType = (template?.importType || "clients") as "clients" | "purchases" | "representatives" | "openOrders";
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -154,6 +173,24 @@ export default function Importacao() {
           fileName,
           mapping,
         });
+      } else if (importType === "representatives") {
+        // Usa Faturamento router que já faz upsert de representantes
+        const fatResult = await importFaturamentoMutation.mutateAsync({ fileBase64, fileName });
+        importResult = {
+          imported: fatResult.summary?.representatives?.created ?? 0,
+          skipped: fatResult.summary?.representatives?.skipped ?? 0,
+          errors: [],
+          total: (fatResult.summary?.representatives?.created ?? 0) + (fatResult.summary?.representatives?.skipped ?? 0),
+        };
+      } else if (importType === "openOrders") {
+        // Usa Faturamento router que detecta pedidos sem NF automaticamente
+        const fatResult = await importFaturamentoMutation.mutateAsync({ fileBase64, fileName });
+        importResult = {
+          imported: fatResult.summary?.openOrders?.created ?? 0,
+          skipped: fatResult.summary?.openOrders?.skipped ?? 0,
+          errors: [],
+          total: (fatResult.summary?.openOrders?.created ?? 0) + (fatResult.summary?.openOrders?.skipped ?? 0),
+        };
       } else {
         importResult = await importClientsMutation.mutateAsync({
           fileBase64,
