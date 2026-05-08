@@ -17,7 +17,7 @@ function getMysqlConfig() {
     user: parsed.username,
     password: parsed.password,
     database: parsed.pathname.slice(1),
-    ssl: { rejectUnauthorized: false },
+    ssl: false,
   };
 }
 

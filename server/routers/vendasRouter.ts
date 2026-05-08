@@ -3,13 +3,13 @@ import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { salesInvoices, openOrders, products, representatives } from "../../drizzle/schema";
 import { eq, sql, and, gte, lte, like, desc, isNotNull } from "drizzle-orm";
-
+ 
 // ============================================================
 // Router de Vendas / Faturamento
 // ============================================================
-
+ 
 export const vendasRouter = router({
-
+ 
   // ── Totais gerais com filtros ──────────────────────────────
   getTotals: protectedProcedure
     .input(z.object({
@@ -23,14 +23,14 @@ export const vendasRouter = router({
     .query(async ({ input }) => {
       const db = await getDb();
       const conditions: ReturnType<typeof and>[] = [];
-
+ 
       if (input.mesAno) conditions.push(eq(salesInvoices.mesAno, input.mesAno));
       if (input.ano) conditions.push(eq(salesInvoices.ano, input.ano));
       if (input.repCode) conditions.push(eq(salesInvoices.repCode, input.repCode));
       if (input.tipoOperacao) conditions.push(eq(salesInvoices.tipoOperacao, input.tipoOperacao));
-
+ 
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
-
+ 
       const [totals] = await db
         .select({
           totalFaturamento: sql<number>`COALESCE(SUM(${salesInvoices.faturamentoRealizado}), 0)`,
@@ -46,10 +46,10 @@ export const vendasRouter = router({
         })
         .from(salesInvoices)
         .where(whereClause);
-
+ 
       return totals;
     }),
-
+ 
   // ── Vendas por representante ───────────────────────────────
   getByRepresentative: protectedProcedure
     .input(z.object({
@@ -63,13 +63,13 @@ export const vendasRouter = router({
     .query(async ({ input }) => {
       const db = await getDb();
       const conditions: ReturnType<typeof and>[] = [];
-
+ 
       if (input.mesAno) conditions.push(eq(salesInvoices.mesAno, input.mesAno));
       if (input.ano) conditions.push(eq(salesInvoices.ano, input.ano));
       if (input.tipoOperacao) conditions.push(eq(salesInvoices.tipoOperacao, input.tipoOperacao));
-
+ 
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
-
+ 
       const rows = await db
         .select({
           repCode: salesInvoices.repCode,
@@ -90,10 +90,10 @@ export const vendasRouter = router({
         .groupBy(salesInvoices.repCode, salesInvoices.repName)
         .orderBy(desc(sql`SUM(${salesInvoices.faturamentoRealizado})`))
         .limit(input.limit);
-
+ 
       return rows;
     }),
-
+ 
   // ── Detalhamento de vendas por representante ───────────────
   getDetailByRep: protectedProcedure
     .input(z.object({
@@ -112,9 +112,9 @@ export const vendasRouter = router({
       if (input.mesAno) conditions.push(eq(salesInvoices.mesAno, input.mesAno));
       if (input.ano) conditions.push(eq(salesInvoices.ano, input.ano));
       if (input.tipoOperacao) conditions.push(eq(salesInvoices.tipoOperacao, input.tipoOperacao));
-
+ 
       const whereClause = and(...conditions);
-
+ 
       if (input.groupBy === "client") {
         return await db
           .select({
@@ -133,7 +133,7 @@ export const vendasRouter = router({
           .orderBy(desc(sql`SUM(${salesInvoices.faturamentoRealizado})`))
           .limit(input.limit);
       }
-
+ 
       if (input.groupBy === "product") {
         return await db
           .select({
@@ -152,7 +152,7 @@ export const vendasRouter = router({
           .orderBy(desc(sql`SUM(${salesInvoices.faturamentoRealizado})`))
           .limit(input.limit);
       }
-
+ 
       // groupBy === "invoice" — lista de NFs individuais
       return await db
         .select({
@@ -179,7 +179,7 @@ export const vendasRouter = router({
         .orderBy(desc(salesInvoices.invoiceDate))
         .limit(input.limit);
     }),
-
+ 
   // ── Vendas por produto ─────────────────────────────────────
   getByProduct: protectedProcedure
     .input(z.object({
@@ -196,9 +196,9 @@ export const vendasRouter = router({
       if (input.ano) conditions.push(eq(salesInvoices.ano, input.ano));
       if (input.repCode) conditions.push(eq(salesInvoices.repCode, input.repCode));
       if (input.tipoOperacao) conditions.push(eq(salesInvoices.tipoOperacao, input.tipoOperacao));
-
+ 
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
-
+ 
       return await db
         .select({
           productCode: salesInvoices.productCode,
@@ -216,7 +216,7 @@ export const vendasRouter = router({
         .orderBy(desc(sql`SUM(${salesInvoices.faturamentoRealizado})`))
         .limit(input.limit);
     }),
-
+ 
   // ── Evolução mensal (para gráfico de linha) ────────────────
   getMonthlyEvolution: protectedProcedure
     .input(z.object({
@@ -231,7 +231,7 @@ export const vendasRouter = router({
       ];
       if (input.repCode) conditions.push(eq(salesInvoices.repCode, input.repCode));
       if (input.tipoOperacao) conditions.push(eq(salesInvoices.tipoOperacao, input.tipoOperacao));
-
+ 
       return await db
         .select({
           mesAno: salesInvoices.mesAno,
@@ -247,12 +247,12 @@ export const vendasRouter = router({
         .orderBy(salesInvoices.ano, salesInvoices.mesAno)
         .limit(input.limit);
     }),
-
+ 
   // ── Lista de filtros disponíveis (meses, representantes, etc.) ──
   getFilterOptions: protectedProcedure
     .query(async () => {
       const db = await getDb();
-
+ 
       const [meses, reps, tiposOp] = await Promise.all([
         db.selectDistinct({ mesAno: salesInvoices.mesAno, ano: salesInvoices.ano })
           .from(salesInvoices)
@@ -266,10 +266,10 @@ export const vendasRouter = router({
           .from(salesInvoices)
           .where(isNotNull(salesInvoices.tipoOperacao)),
       ]);
-
+ 
       return { meses, reps, tiposOp };
     }),
-
+ 
   // ── Vendas por UF (estado) ──────────────────────────────────
   getByUF: protectedProcedure
     .input(z.object({
@@ -288,7 +288,7 @@ export const vendasRouter = router({
       if (input.ano) conditions.push(eq(salesInvoices.ano, input.ano));
       if (input.repCode) conditions.push(eq(salesInvoices.repCode, input.repCode));
       if (input.tipoOperacao) conditions.push(eq(salesInvoices.tipoOperacao, input.tipoOperacao));
-
+ 
       return await db
         .select({
           uf: salesInvoices.uf,
@@ -306,7 +306,7 @@ export const vendasRouter = router({
         .orderBy(desc(sql`SUM(${salesInvoices.faturamentoRealizado})`))
         .limit(input.limit);
     }),
-
+ 
   // ── Filtros: adicionar UFs disponíveis ────────────────────────
   getUFOptions: protectedProcedure
     .query(async () => {
@@ -318,7 +318,7 @@ export const vendasRouter = router({
         .orderBy(salesInvoices.uf);
       return ufs.map(r => r.uf).filter(Boolean) as string[];
     }),
-
+ 
   // ── Pedidos em aberto ──────────────────────────────────────
   getOpenOrders: protectedProcedure
     .input(z.object({
@@ -329,14 +329,50 @@ export const vendasRouter = router({
       const db = await getDb();
       const conditions: ReturnType<typeof and>[] = [];
       if (input.repCode) conditions.push(eq(openOrders.repCode, input.repCode));
-
+ 
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
-
-      return await db
-        .select()
+ 
+      const rows = await db
+        .select({
+          id: openOrders.id,
+          orderNumber: openOrders.orderNumber,
+          orderDate: openOrders.orderDate,
+          clientCode: openOrders.clientCode,
+          clientName: openOrders.clientName,
+          productCode: openOrders.productCode,
+          productName: openOrders.productName,
+          repCode: openOrders.repCode,
+          repName: openOrders.repName,
+          qtdSacos: openOrders.qtdSacos,
+          precoPorSaco: openOrders.precoPorSaco,
+          faturamentoEstimado: openOrders.faturamentoEstimado,
+          volumeEstimado: openOrders.volumeEstimado,
+          tipoOperacao: openOrders.tipoOperacao,
+          mesAno: openOrders.mesAno,
+          filial: openOrders.filial,
+          status: openOrders.status,
+          createdAt: openOrders.createdAt,
+          // Join fallbacks para campos nulos
+          clientNameJoin: sql<string>`c.name`,
+          repNameJoin: sql<string>`r.name`,
+          productNameJoin: sql<string>`p.name`,
+        })
         .from(openOrders)
+        .leftJoin(sql`clients c`, sql`c.id = ${openOrders.clientId}`)
+        .leftJoin(sql`representatives r`, sql`r.id = ${openOrders.representativeId}`)
+        .leftJoin(sql`products p`, sql`p.id = ${openOrders.productId}`)
         .where(whereClause)
         .orderBy(desc(openOrders.createdAt))
         .limit(input.limit);
+ 
+      // Preenche campos nulos com os valores das tabelas relacionadas
+      return rows.map(r => ({
+        ...r,
+        clientName:  r.clientName  || r.clientNameJoin  || r.clientCode  || "-",
+        repName:     r.repName     || r.repNameJoin     || r.repCode     || "-",
+        productName: r.productName || r.productNameJoin || r.productCode || "-",
+        orderNumber: r.orderNumber || "-",
+      }));
     }),
 });
+ 
