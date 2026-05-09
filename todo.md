@@ -1,4 +1,4 @@
-# AgroGestão CRM - TODO
+# Gestão_Regional-CRM - TODO
 
 ## Backend & Infraestrutura
 - [x] Schema do banco de dados (SQLite + Drizzle ORM) com todas as tabelas
