@@ -1,4 +1,4 @@
-import { useAuth } from "@/_core/hooks/useAuth";
+﻿import { useAuth } from "@/_core/hooks/useAuth";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -20,22 +20,17 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
-  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/useMobile";
 import { trpc } from "@/lib/trpc";
 import {
-  Activity,
-  AlertCircle,
   BarChart3,
   Bell,
-  Bot,
   Briefcase,
   Building2,
-  ChevronDown,
   ChevronUp,
-  ClipboardList,
+  DollarSign,
   Download,
   LayoutDashboard,
   LogOut,
@@ -46,12 +41,7 @@ import {
   Target,
   TrendingUp,
   Users,
-  Zap,
-  Smartphone,
-  Filter,
   X,
-  Shield,
-  DollarSign,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -60,50 +50,31 @@ import { Button } from "./ui/button";
 
 const menuGroups = [
   {
-    label: "Principal",
+    label: "Dashboards",
     items: [
-      { icon: LayoutDashboard, label: "Dashboard", path: "/" },
+      { icon: LayoutDashboard, label: "Início", path: "/" },
+      { icon: DollarSign, label: "Vendas", path: "/vendas" },
+      { icon: TrendingUp, label: "Analytics", path: "/analytics" },
     ],
   },
   {
-    label: "Gestão Comercial",
+    label: "Gestão",
     items: [
       { icon: Users, label: "Representantes", path: "/representantes" },
       { icon: Building2, label: "Clientes", path: "/clientes" },
-      { icon: DollarSign, label: "Vendas", path: "/vendas" },
       { icon: Briefcase, label: "Oportunidades", path: "/oportunidades" },
       { icon: Target, label: "Metas", path: "/metas" },
-      { icon: Activity, label: "Atividades", path: "/atividades" },
     ],
   },
   {
-    label: "Análise & IA",
+    label: "Ferramentas",
     items: [
-      { icon: BarChart3, label: "Relatórios", path: "/relatorios" },
-      { icon: Bot, label: "IA Insights", path: "/ia-insights" },
-      { icon: TrendingUp, label: "Analytics", path: "/analytics" },
-      { icon: Map, label: "Mapa Geográfico", path: "/mapa" },
-    ],
-  },
-  {
-    label: "Operações",
-    items: [
-      { icon: ClipboardList, label: "App Representante", path: "/campo" },
-      { icon: Smartphone, label: "Registro de Campo", path: "/registro-mobile" },
-      { icon: Bell, label: "Alertas", path: "/alertas" },
+      { icon: Map, label: "Mapa", path: "/mapa" },
+      { icon: Download, label: "Importar", path: "/importacao" },
       { icon: Settings, label: "Preferências", path: "/preferencias" },
-      { icon: Download, label: "Importar Dados", path: "/importacao" },
-      { icon: Zap, label: "Automações", path: "/automacoes" },
     ],
   },
 ];
-
-const adminMenuGroup = {
-  label: "Administração",
-  items: [
-    { icon: Shield, label: "Admin", path: "/admin" },
-  ],
-};
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
 const DEFAULT_WIDTH = 260;
@@ -115,7 +86,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
     return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
   });
-  const { loading, user } = useAuth({ redirectOnUnauthenticated: true });
+  const { loading, user } = useAuth();
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebarWidth.toString());
@@ -160,12 +131,9 @@ function DashboardLayoutContent({
   });
   const unreadCount = notifData?.filter(n => !n.isRead).length || 0;
 
-  const isSuperadmin = user?.role === "superadmin";
-  const displayMenuGroups = isSuperadmin ? [...menuGroups, adminMenuGroup] : menuGroups;
-
-  const activeLabel = displayMenuGroups
+  const activeLabel = menuGroups
     .flatMap(g => g.items)
-    .find(item => item.path === location)?.label || "Dashboard";
+    .find(item => item.path === location)?.label || "AgroGestão";
 
   useEffect(() => {
     if (isCollapsed) setIsResizing(false);
@@ -193,7 +161,6 @@ function DashboardLayoutContent({
     };
   }, [isResizing, setSidebarWidth]);
 
-  // Close mobile menu on navigation
   const handleNavigate = (path: string) => {
     setLocation(path);
     if (isMobile) {
@@ -204,68 +171,66 @@ function DashboardLayoutContent({
   return (
     <>
       <div className="relative" ref={sidebarRef}>
-        <Sidebar collapsible={isMobile ? "offcanvas" : "icon"} className="border-r-0" disableTransition={isResizing}>
-          <SidebarHeader className="h-14 justify-center border-b border-sidebar-border">
+        <Sidebar collapsible={isMobile ? "offcanvas" : "icon"} className="border-r" disableTransition={isResizing}>
+          <SidebarHeader className="h-16 border-b">
             <div className="flex items-center gap-3 px-2 w-full">
               {!isMobile && (
                 <button
                   onClick={toggleSidebar}
-                  className="h-9 w-9 flex items-center justify-center hover:bg-sidebar-accent rounded-lg transition-colors focus:outline-none shrink-0"
+                  className="h-9 w-9 flex items-center justify-center hover:bg-accent rounded-lg transition-colors"
                   aria-label="Toggle navigation"
                 >
-                  <PanelLeft className="h-4 w-4 text-sidebar-foreground/70" />
+                  <PanelLeft className="h-4 w-4" />
                 </button>
               )}
               {isMobile && (
                 <button
                   onClick={() => setOpenMobile(false)}
-                  className="h-9 w-9 flex items-center justify-center hover:bg-sidebar-accent rounded-lg transition-colors focus:outline-none shrink-0"
+                  className="h-9 w-9 flex items-center justify-center hover:bg-accent rounded-lg transition-colors"
                   aria-label="Fechar menu"
                 >
-                  <X className="h-4 w-4 text-sidebar-foreground/70" />
+                  <X className="h-4 w-4" />
                 </button>
               )}
               {(!isCollapsed || isMobile) && (
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-7 h-7 rounded-lg bg-sidebar-primary flex items-center justify-center shrink-0">
-                    <BarChart3 className="h-4 w-4 text-sidebar-primary-foreground" />
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
+                    <BarChart3 className="h-5 w-5 text-primary-foreground" />
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold text-sidebar-foreground truncate leading-none">AgroGestão</p>
-                    <p className="text-xs text-sidebar-foreground/60 truncate mt-0.5">CRM Regional</p>
+                  <div>
+                    <p className="text-sm font-bold leading-none">AgroGestão</p>
+                    <p className="text-xs text-muted-foreground">CRM</p>
                   </div>
                 </div>
               )}
             </div>
           </SidebarHeader>
 
-          <SidebarContent className="gap-0 py-3 overflow-y-auto">
-            {displayMenuGroups.map(group => (
-              <SidebarGroup key={group.label} className="py-2 gap-3">
+          <SidebarContent className="gap-0 py-4">
+            {menuGroups.map(group => (
+              <SidebarGroup key={group.label} className="py-3">
                 {(!isCollapsed || isMobile) && (
-                  <SidebarGroupLabel className="text-sidebar-foreground/40 text-xs font-semibold uppercase tracking-wider px-3 py-2 h-8 flex items-center">
+                  <SidebarGroupLabel className="text-xs font-semibold uppercase tracking-wide px-3 text-muted-foreground">
                     {group.label}
                   </SidebarGroupLabel>
                 )}
-                <SidebarMenu className="px-2 gap-1 flex flex-col">
+                <SidebarMenu className="px-2 gap-1">
                   {group.items.map(item => {
                     const isActive = location === item.path;
-                    const isNotif = item.path === "/notificacoes" && unreadCount > 0;
                     return (
-                      <SidebarMenuItem key={item.path} className="h-12 flex items-center">
+                      <SidebarMenuItem key={item.path}>
                         <SidebarMenuButton
                           isActive={isActive}
                           onClick={() => handleNavigate(item.path)}
                           tooltip={item.label}
-                          className={`h-full w-full transition-all font-normal text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent ${isActive ? "bg-sidebar-primary/20 text-sidebar-primary font-medium" : ""}`}
+                          className={`h-10 transition-colors ${
+                            isActive 
+                              ? "bg-primary text-primary-foreground" 
+                              : "hover:bg-accent"
+                          }`}
                         >
-                          <item.icon className={`h-5 w-5 shrink-0 ${isActive ? "text-sidebar-primary" : ""}`} />
-                          <span className="truncate text-sm">{item.label}</span>
-                          {isNotif && (
-                            <Badge className="ml-auto h-4 min-w-4 px-1 text-xs bg-red-500 text-white border-0">
-                              {unreadCount > 9 ? "9+" : unreadCount}
-                            </Badge>
-                          )}
+                          <item.icon className="h-4 w-4" />
+                          <span className="text-sm">{item.label}</span>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
                     );
@@ -275,29 +240,25 @@ function DashboardLayoutContent({
             ))}
           </SidebarContent>
 
-          <SidebarFooter className="p-3 border-t border-sidebar-border">
+          <SidebarFooter className="border-t p-3">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-sidebar-accent transition-colors w-full text-left focus:outline-none min-h-[44px]">
-                  <Avatar className="h-8 w-8 border border-sidebar-border shrink-0">
-                    <AvatarFallback className="text-xs font-medium bg-sidebar-primary text-sidebar-primary-foreground">
-                      {user?.name?.charAt(0).toUpperCase() || "U"}
+                <button className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-accent w-full text-left min-h-[44px]">
+                  <Avatar className="h-8 w-8 border">
+                    <AvatarFallback className="text-xs font-medium bg-primary text-primary-foreground">
+                      {user?.name?.charAt(0).toUpperCase() || "A"}
                     </AvatarFallback>
                   </Avatar>
                   {(!isCollapsed || isMobile) && (
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-sidebar-foreground truncate leading-none">
-                        {user?.name || "Usuário"}
-                      </p>
-                      <p className="text-xs text-sidebar-foreground/50 truncate mt-1">
-                        {user?.email || ""}
-                      </p>
+                      <p className="text-xs font-medium truncate">{user?.name || "Admin"}</p>
+                      <p className="text-xs text-muted-foreground truncate">{user?.email || ""}</p>
                     </div>
                   )}
-                  {(!isCollapsed || isMobile) && <ChevronUp className="h-3 w-3 text-sidebar-foreground/40 shrink-0" />}
+                  {(!isCollapsed || isMobile) && <ChevronUp className="h-3 w-3" />}
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuContent align="end" className="w-48">
                 <div className="px-2 py-1.5">
                   <p className="text-sm font-medium">{user?.name}</p>
                   <p className="text-xs text-muted-foreground">{user?.email}</p>
@@ -305,7 +266,7 @@ function DashboardLayoutContent({
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => handleNavigate("/preferencias")}
-                  className="cursor-pointer min-h-[44px]"
+                  className="cursor-pointer"
                 >
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Preferências</span>
@@ -313,7 +274,7 @@ function DashboardLayoutContent({
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={logout}
-                  className="cursor-pointer text-destructive focus:text-destructive min-h-[44px]"
+                  className="cursor-pointer text-destructive focus:text-destructive"
                 >
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Sair</span>
@@ -325,7 +286,9 @@ function DashboardLayoutContent({
 
         {!isMobile && (
           <div
-            className={`absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-primary/20 transition-colors ${isCollapsed ? "hidden" : ""}`}
+            className={`absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-primary/20 ${
+              isCollapsed ? "hidden" : ""
+            }`}
             onMouseDown={() => { if (!isCollapsed) setIsResizing(true); }}
             style={{ zIndex: 50 }}
           />
@@ -333,35 +296,29 @@ function DashboardLayoutContent({
       </div>
 
       <SidebarInset>
-        {/* Mobile/Tablet top bar */}
-        <div className="flex border-b h-14 items-center justify-between bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:backdrop-blur sticky top-0 z-40 lg:hidden">
+        <div className="flex border-b h-14 items-center justify-between bg-background px-4 sticky top-0 z-40 lg:hidden">
           <div className="flex items-center gap-2">
             <button
               onClick={toggleSidebar}
-              className="h-10 w-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors"
+              className="h-10 w-10 flex items-center justify-center rounded-lg hover:bg-accent"
               aria-label="Abrir menu"
             >
               <Menu className="h-5 w-5" />
             </button>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-md bg-primary flex items-center justify-center">
-                <BarChart3 className="h-3.5 w-3.5 text-primary-foreground" />
-              </div>
-              <span className="font-semibold text-sm">{activeLabel}</span>
-            </div>
+            <span className="font-semibold text-sm">{activeLabel}</span>
           </div>
           <button
-            onClick={() => handleNavigate("/alertas")}
+            onClick={() => handleNavigate("/")}
             className="relative h-10 w-10 flex items-center justify-center rounded-lg hover:bg-accent"
           >
             <Bell className="h-5 w-5" />
             {unreadCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500" />
+              <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500" />
             )}
           </button>
         </div>
 
-        <main className="flex-1 p-3 sm:p-4 md:p-6">{children}</main>
+        <main className="flex-1 p-4 md:p-6 bg-background/50">{children}</main>
       </SidebarInset>
     </>
   );
