@@ -133,7 +133,7 @@ function DashboardLayoutContent({
 
   const activeLabel = menuGroups
     .flatMap(g => g.items)
-    .find(item => item.path === location)?.label || "AgroGestão";
+    .find(item => item.path === location)?.label || "Gestão Regional";
 
   useEffect(() => {
     if (isCollapsed) setIsResizing(false);
@@ -198,7 +198,7 @@ function DashboardLayoutContent({
                     <BarChart3 className="h-5 w-5 text-primary-foreground" />
                   </div>
                   <div>
-                    <p className="text-sm font-bold leading-none">AgroGestão</p>
+                    <p className="text-sm font-bold leading-none">Gestão Regional</p>
                     <p className="text-xs text-muted-foreground">CRM</p>
                   </div>
                 </div>
