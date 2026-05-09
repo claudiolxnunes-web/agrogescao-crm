@@ -1,324 +1,176 @@
-import { useAuth } from "@/_core/hooks/useAuth";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarGroup,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarInset,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-  useSidebar,
-} from "@/components/ui/sidebar";
-import { useIsMobile } from "@/hooks/useMobile";
-import { trpc } from "@/lib/trpc";
-import {
-  BarChart3,
-  Bell,
-  Briefcase,
-  Building2,
-  ChevronUp,
-  DollarSign,
-  Download,
-  LayoutDashboard,
-  LogOut,
-  Map,
-  Menu,
-  PanelLeft,
-  Settings,
-  Target,
-  TrendingUp,
-  Users,
-  X,
-} from "lucide-react";
-import { CSSProperties, useState } from "react";
-import { useLocation } from "wouter";
-import { DashboardLayoutSkeleton } from "@/components/DashboardLayoutSkeleton";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { Users, Building2, TrendingUp, Package, ArrowUpRight, ArrowDownRight } from "lucide-react";
 
-const menuGroups = [
-  {
-    label: "Dashboards",
-    items: [
-      { icon: LayoutDashboard, label: "Início", path: "/" },
-      { icon: DollarSign, label: "Vendas", path: "/vendas" },
-      { icon: TrendingUp, label: "Analytics", path: "/analytics" },
-    ],
-  },
-  {
-    label: "Gestão",
-    items: [
-      { icon: Users, label: "Representantes", path: "/representantes" },
-      { icon: Building2, label: "Clientes", path: "/clientes" },
-      { icon: Briefcase, label: "Oportunidades", path: "/oportunidades" },
-      { icon: Target, label: "Metas", path: "/metas" },
-    ],
-  },
-  {
-    label: "Ferramentas",
-    items: [
-      { icon: Map, label: "Mapa", path: "/mapa" },
-      { icon: Download, label: "Importar", path: "/importacao" },
-      { icon: Settings, label: "Preferências", path: "/preferencias" },
-    ],
-  },
-];
+// Mock data - depois conectar ao tRPC
+const mockData = {
+  representatives: 15,
+  activeClients: 1217,
+  revenue: 9400000,
+  products: 57128,
+  topReps: [
+    { name: "ANESIO JUNIOR F. AGRO LTDA", value: 1900000, trend: "up" },
+    { name: "BRUNO PEREIRA -RP REPRESENTACOES", value: 1700000, trend: "up" },
+    { name: "GUSTAVO FARIA- TAGUEZE REPRESENTACOES", value: 1500000, trend: "down" },
+  ],
+  monthlyRevenue: [
+    { month: "Jan", revenue: 650000 },
+    { month: "Fev", revenue: 720000 },
+    { month: "Mar", revenue: 890000 },
+    { month: "Abr", revenue: 940000 },
+    { month: "Mai", revenue: 1100000 },
+    { month: "Jun", revenue: 1200000 },
+  ],
+  clientsBySegment: [
+    { name: "A", value: 250, fill: "#3b82f6" },
+    { name: "B", value: 450, fill: "#10b981" },
+    { name: "C", value: 350, fill: "#f59e0b" },
+    { name: "D", value: 167, fill: "#ef4444" },
+  ],
+};
 
-const SIDEBAR_WIDTH_KEY = "sidebar-width";
-const DEFAULT_WIDTH = 260;
-const MIN_WIDTH = 200;
-const MAX_WIDTH = 400;
+const KPICard = ({ icon: Icon, label, value, unit, trend, color }: any) => (
+  <Card className="border-0 shadow-sm hover:shadow-md transition-shadow">
+    <CardContent className="pt-6">
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <p className="text-sm text-muted-foreground mb-2">{label}</p>
+          <div className="flex items-baseline gap-2">
+            <p className="text-3xl font-bold">{value}</p>
+            {unit && <p className="text-sm text-muted-foreground">{unit}</p>}
+          </div>
+        </div>
+        <div className={`p-3 rounded-lg ${color}`}>
+          <Icon className="h-6 w-6 text-white" />
+        </div>
+      </div>
+    </CardContent>
+  </Card>
+);
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const [sidebarWidth, setSidebarWidth] = useState(() => {
-    const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
-    return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
-  });
-  const { loading, user } = useAuth();
-
-  useEffect(() => {
-    localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebarWidth.toString());
-  }, [sidebarWidth]);
-
-  if (loading) {
-    return <DashboardLayoutSkeleton />;
-  }
-
-  if (!user) {
-    return <DashboardLayoutSkeleton />;
-  }
-
+export default function Dashboard() {
   return (
-    <SidebarProvider
-      style={{ "--sidebar-width": `${sidebarWidth}px` } as CSSProperties}
-    >
-      <DashboardLayoutContent setSidebarWidth={setSidebarWidth}>
-        {children}
-      </DashboardLayoutContent>
-    </SidebarProvider>
-  );
-}
-
-function DashboardLayoutContent({
-  children,
-  setSidebarWidth,
-}: {
-  children: React.ReactNode;
-  setSidebarWidth: (w: number) => void;
-}) {
-  const { user, logout } = useAuth();
-  const [location, setLocation] = useLocation();
-  const { state, toggleSidebar, openMobile, setOpenMobile } = useSidebar();
-  const isCollapsed = state === "collapsed";
-  const [isResizing, setIsResizing] = useState(false);
-  const sidebarRef = useRef<HTMLDivElement>(null);
-  const isMobile = useIsMobile();
-
-  const { data: notifData } = trpc.notifications.list.useQuery({ unreadOnly: true }, {
-    refetchInterval: 30000,
-  });
-  const unreadCount = notifData?.filter(n => !n.isRead).length || 0;
-
-  const activeLabel = menuGroups
-    .flatMap(g => g.items)
-    .find(item => item.path === location)?.label || "AgroGestão";
-
-  useEffect(() => {
-    if (isCollapsed) setIsResizing(false);
-  }, [isCollapsed]);
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isResizing) return;
-      const sidebarLeft = sidebarRef.current?.getBoundingClientRect().left ?? 0;
-      const newWidth = e.clientX - sidebarLeft;
-      if (newWidth >= MIN_WIDTH && newWidth <= MAX_WIDTH) setSidebarWidth(newWidth);
-    };
-    const handleMouseUp = () => setIsResizing(false);
-    if (isResizing) {
-      document.addEventListener("mousemove", handleMouseMove);
-      document.addEventListener("mouseup", handleMouseUp);
-      document.body.style.cursor = "col-resize";
-      document.body.style.userSelect = "none";
-    }
-    return () => {
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-    };
-  }, [isResizing, setSidebarWidth]);
-
-  const handleNavigate = (path: string) => {
-    setLocation(path);
-    if (isMobile) {
-      setOpenMobile(false);
-    }
-  };
-
-  return (
-    <>
-      <div className="relative" ref={sidebarRef}>
-        <Sidebar collapsible={isMobile ? "offcanvas" : "icon"} className="border-r" disableTransition={isResizing}>
-          <SidebarHeader className="h-16 border-b">
-            <div className="flex items-center gap-3 px-2 w-full">
-              {!isMobile && (
-                <button
-                  onClick={toggleSidebar}
-                  className="h-9 w-9 flex items-center justify-center hover:bg-accent rounded-lg transition-colors"
-                  aria-label="Toggle navigation"
-                >
-                  <PanelLeft className="h-4 w-4" />
-                </button>
-              )}
-              {isMobile && (
-                <button
-                  onClick={() => setOpenMobile(false)}
-                  className="h-9 w-9 flex items-center justify-center hover:bg-accent rounded-lg transition-colors"
-                  aria-label="Fechar menu"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-              {(!isCollapsed || isMobile) && (
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-                    <BarChart3 className="h-5 w-5 text-primary-foreground" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold leading-none">AgroGestão</p>
-                    <p className="text-xs text-muted-foreground">CRM</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </SidebarHeader>
-
-          <SidebarContent className="gap-0 py-4">
-            {menuGroups.map(group => (
-              <SidebarGroup key={group.label} className="py-3">
-                {(!isCollapsed || isMobile) && (
-                  <SidebarGroupLabel className="text-xs font-semibold uppercase tracking-wide px-3 text-muted-foreground">
-                    {group.label}
-                  </SidebarGroupLabel>
-                )}
-                <SidebarMenu className="px-2 gap-1">
-                  {group.items.map(item => {
-                    const isActive = location === item.path;
-                    return (
-                      <SidebarMenuItem key={item.path}>
-                        <SidebarMenuButton
-                          isActive={isActive}
-                          onClick={() => handleNavigate(item.path)}
-                          tooltip={item.label}
-                          className={`h-10 transition-colors ${
-                            isActive 
-                              ? "bg-primary text-primary-foreground" 
-                              : "hover:bg-accent"
-                          }`}
-                        >
-                          <item.icon className="h-4 w-4" />
-                          <span className="text-sm">{item.label}</span>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    );
-                  })}
-                </SidebarMenu>
-              </SidebarGroup>
-            ))}
-          </SidebarContent>
-
-          <SidebarFooter className="border-t p-3">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-accent w-full text-left min-h-[44px]">
-                  <Avatar className="h-8 w-8 border">
-                    <AvatarFallback className="text-xs font-medium bg-primary text-primary-foreground">
-                      {user?.name?.charAt(0).toUpperCase() || "A"}
-                    </AvatarFallback>
-                  </Avatar>
-                  {(!isCollapsed || isMobile) && (
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium truncate">{user?.name || "Admin"}</p>
-                      <p className="text-xs text-muted-foreground truncate">{user?.email || ""}</p>
-                    </div>
-                  )}
-                  {(!isCollapsed || isMobile) && <ChevronUp className="h-3 w-3" />}
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <div className="px-2 py-1.5">
-                  <p className="text-sm font-medium">{user?.name}</p>
-                  <p className="text-xs text-muted-foreground">{user?.email}</p>
-                </div>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => handleNavigate("/preferencias")}
-                  className="cursor-pointer"
-                >
-                  <Settings className="mr-2 h-4 w-4" />
-                  <span>Preferências</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={logout}
-                  className="cursor-pointer text-destructive focus:text-destructive"
-                >
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Sair</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </SidebarFooter>
-        </Sidebar>
-
-        {!isMobile && (
-          <div
-            className={`absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-primary/20 ${
-              isCollapsed ? "hidden" : ""
-            }`}
-            onMouseDown={() => { if (!isCollapsed) setIsResizing(true); }}
-            style={{ zIndex: 50 }}
-          />
-        )}
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-bold">Dashboard Executivo</h1>
+        <p className="text-muted-foreground mt-1">Visão geral de performance comercial</p>
       </div>
 
-      <SidebarInset>
-        <div className="flex border-b h-14 items-center justify-between bg-background px-4 sticky top-0 z-40 lg:hidden">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={toggleSidebar}
-              className="h-10 w-10 flex items-center justify-center rounded-lg hover:bg-accent"
-              aria-label="Abrir menu"
-            >
-              <Menu className="h-5 w-5" />
-            </button>
-            <span className="font-semibold text-sm">{activeLabel}</span>
-          </div>
-          <button
-            onClick={() => handleNavigate("/")}
-            className="relative h-10 w-10 flex items-center justify-center rounded-lg hover:bg-accent"
-          >
-            <Bell className="h-5 w-5" />
-            {unreadCount > 0 && (
-              <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500" />
-            )}
-          </button>
-        </div>
+      {/* KPIs */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <KPICard
+          icon={Users}
+          label="REPRESENTANTES"
+          value={mockData.representatives}
+          unit="Equipe ativa"
+          color="bg-blue-500"
+        />
+        <KPICard
+          icon={Building2}
+          label="CLIENTES ATIVOS"
+          value={mockData.activeClients}
+          unit="Carteira atual"
+          color="bg-green-500"
+        />
+        <KPICard
+          icon={TrendingUp}
+          label="FATURAMENTO IMPORTADO"
+          value="R$ 9.4M"
+          unit="468 notas fiscais"
+          color="bg-amber-500"
+        />
+        <KPICard
+          icon={Package}
+          label="PRODUTOS VENDIDOS"
+          value={mockData.products}
+          unit="Volume: 1490100 t"
+          color="bg-orange-500"
+        />
+      </div>
 
-        <main className="flex-1 p-4 md:p-6 bg-background/50">{children}</main>
-      </SidebarInset>
-    </>
+      {/* Charts Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Revenue Trend */}
+        <Card className="border-0 shadow-sm">
+          <CardHeader>
+            <CardTitle>Evolução de Faturamento</CardTitle>
+            <CardDescription>Últimos 6 meses</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={mockData.monthlyRevenue}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="month" stroke="#9ca3af" />
+                <YAxis stroke="#9ca3af" />
+                <Tooltip formatter={(value) => `R$ ${(value / 1000000).toFixed(1)}M`} />
+                <Line type="monotone" dataKey="revenue" stroke="#3b82f6" strokeWidth={2} dot={{ fill: "#3b82f6", r: 4 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Clients by Segment */}
+        <Card className="border-0 shadow-sm">
+          <CardHeader>
+            <CardTitle>Clientes por Segmento</CardTitle>
+            <CardDescription>Distribuição ABC</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie data={mockData.clientsBySegment} cx="50%" cy="50%" labelLine={false} label={({ name, value }) => `${name}: ${value}`} outerRadius={100} fill="#8884d8" dataKey="value">
+                  {mockData.clientsBySegment.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Top Representatives */}
+      <Card className="border-0 shadow-sm">
+        <CardHeader>
+          <CardTitle>🏆 Top Representantes por Faturamento</CardTitle>
+          <CardDescription>Baseado nas notas fiscais importadas</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {mockData.topReps.map((rep, idx) => (
+              <div key={idx} className="flex items-center justify-between pb-4 border-b last:border-0">
+                <div className="flex items-center gap-4">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-sm">
+                    {idx + 1}
+                  </div>
+                  <div>
+                    <p className="font-medium">{rep.name}</p>
+                    <p className="text-sm text-muted-foreground">Faturamento acumulado</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="font-bold text-lg">R$ {(rep.value / 1000000).toFixed(1)}M</p>
+                  <div className="flex items-center gap-1 justify-end mt-1">
+                    {rep.trend === "up" ? (
+                      <>
+                        <ArrowUpRight className="h-4 w-4 text-green-500" />
+                        <span className="text-xs text-green-500">+12%</span>
+                      </>
+                    ) : (
+                      <>
+                        <ArrowDownRight className="h-4 w-4 text-red-500" />
+                        <span className="text-xs text-red-500">-5%</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
