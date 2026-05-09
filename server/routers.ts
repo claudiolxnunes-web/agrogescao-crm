@@ -9,7 +9,8 @@ import { z } from "zod/v4";
 import {
   users, representatives, clients, opportunities, goals,
   activities, salesHistory, notifications, notificationPreferences,
-  automations, purchases, regions, dailyReports, licenses, loginHistory
+  automations, purchases, regions, dailyReports, licenses, loginHistory,
+  salesInvoices, openOrders, products
 } from "../drizzle/schema";
 import { invokeLLM } from "./_core/llm";
 import { importRouter } from "./routers/importRouter";
@@ -2223,7 +2224,8 @@ const adminRouter = router({
         throw new Error("Frase de confirmação incorreta");
       }
       const db = getDb();
-      // Apagar na ordem correta (dependências primeiro)
+      // Apagar na ordem correta (respeitando restrições de chave estrangeira)
+      // 1. Apagar registros que dependem de clients, representatives e products
       await db.delete(purchases);
       await db.delete(salesHistory);
       await db.delete(dailyReports);
@@ -2232,10 +2234,16 @@ const adminRouter = router({
       await db.delete(opportunities);
       await db.delete(notifications);
       await db.delete(automations);
+      // 2. Apagar registros de faturamento que referenciam clients, representatives e products
+      await db.delete(salesInvoices);
+      await db.delete(openOrders);
+      // 3. Apagar tabelas de dados mestres
       await db.delete(clients);
+      await db.delete(representatives);
+      await db.delete(products);
       return {
         success: true,
-        message: "Base de dados limpa com sucesso. Clientes, oportunidades, metas, atividades e histórico de vendas foram removidos.",
+        message: "Base de dados limpa com sucesso. Clientes, representantes, produtos, oportunidades, metas, atividades, vendas e histórico foram removidos.",
         deletedAt: new Date(),
       };
     }),
