@@ -4,7 +4,7 @@ import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import DashboardLayout from "./components/DashboardLayout";
-// Pages - Antigas
+// Pages
 import Dashboard from "./pages/Dashboard";
 import Representantes from "./pages/Representantes";
 import Clientes from "./pages/Clientes";
@@ -23,17 +23,6 @@ import Automacoes from "./pages/Automacoes";
 import RegistroMobile from "./pages/RegistroMobile";
 import Campo from "./pages/Campo";
 import { Admin } from "./pages/Admin";
-
-// ✅ Pages - NOVAS (Deploy 2024)
-import Clients from "./pages/Clients";
-import Representatives from "./pages/Representatives";
-import Opportunities from "./pages/Opportunities";
-import Map from "./pages/Map";
-import AIPlanning from "./pages/AIPlanning";
-import Goals from "./pages/Goals";
-import Alerts from "./pages/Alerts";
-import Interactions from "./pages/Interactions";
-import Surveys from "./pages/Surveys";
 
 function PageRoute({ component: Component }: { component: React.ComponentType }) {
   return (
@@ -69,18 +58,6 @@ function Router() {
       <Route path="/registro-mobile" component={() => <PageRoute component={RegistroMobile} />} />
       <Route path="/campo" component={Campo} />
       <Route path="/rep" component={Campo} />
-
-      {/* ✅ NOVAS ROTAS - Deploy 2024 */}
-      <Route path="/clients" component={() => <PageRoute component={Clients} />} />
-      <Route path="/representatives" component={() => <PageRoute component={Representatives} />} />
-      <Route path="/opportunities" component={() => <PageRoute component={Opportunities} />} />
-      <Route path="/map" component={() => <PageRoute component={Map} />} />
-      <Route path="/planejamento" component={() => <PageRoute component={AIPlanning} />} />
-      <Route path="/goals" component={() => <PageRoute component={Goals} />} />
-      <Route path="/interactions" component={() => <PageRoute component={Interactions} />} />
-      <Route path="/surveys" component={() => <PageRoute component={Surveys} />} />
-
-      {/* Fallback - página padrão */}
       <Route component={() => <PageRoute component={Dashboard} />} />
     </Switch>
   );

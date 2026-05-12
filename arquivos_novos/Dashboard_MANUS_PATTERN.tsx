@@ -1,22 +1,24 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  LineChart,
-  Line,
   BarChart,
   Bar,
-  PieChart,
-  Pie,
-  Cell,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   Legend,
   ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
 } from "recharts";
 import { Users, TrendingUp, DollarSign, Package, ArrowUpRight, ArrowDownRight } from "lucide-react";
 
-// Mock data - DEPOIS CONECTAR AO tRPC
+const COLORS = ["#10b981", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899"];
+
+// Mock data - conectar ao tRPC depois
 const mockMetrics = {
   totalRepresentatives: 15,
   totalActiveClients: 1217,
@@ -41,15 +43,7 @@ const mockMetrics = {
     { id: 2, name: "BRUNO PEREIRA -RP REPRESENTACOES", revenue: 1700000, trend: "up" },
     { id: 3, name: "GUSTAVO FARIA- TAGUEZE REPRESENTACOES", revenue: 1500000, trend: "down" },
   ],
-  revenueBySegment: [
-    { segment: "Segmento A", value: 1200000 },
-    { segment: "Segmento B", value: 2800000 },
-    { segment: "Segmento C", value: 2400000 },
-    { segment: "Segmento D", value: 1000000 },
-  ],
 };
-
-const COLORS = ["#10b981", "#3b82f6", "#f59e0b", "#ef4444"];
 
 interface KPICardProps {
   icon: React.ComponentType<{ className?: string }>;
@@ -156,34 +150,6 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Revenue by Segment */}
-        <Card className="border-0 shadow-sm">
-          <CardHeader>
-            <CardTitle>Faturamento por Segmento</CardTitle>
-            <CardDescription>Distribuição de receita</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="w-full h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={mockMetrics.revenueBySegment}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="segment" stroke="#9ca3af" angle={-45} textAnchor="end" height={80} />
-                  <YAxis stroke="#9ca3af" />
-                  <Tooltip
-                    formatter={(value) =>
-                      `R$ ${(value as number / 1000000).toFixed(1)}M`
-                    }
-                  />
-                  <Bar dataKey="value" fill="#10b981" radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Charts Grid - 2 Columns */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Clients by Segment */}
         <Card className="border-0 shadow-sm">
           <CardHeader>
@@ -211,47 +177,6 @@ export default function Dashboard() {
                   <Tooltip />
                 </PieChart>
               </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Ticket Médio */}
-        <Card className="border-0 shadow-sm">
-          <CardHeader>
-            <CardTitle>Métricas Principais</CardTitle>
-            <CardDescription>KPIs de performance</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-              <div>
-                <p className="text-xs text-muted-foreground">Ticket Médio</p>
-                <p className="text-2xl font-bold">
-                  R$ {(totalRevenue / 200000).toFixed(0)}K
-                </p>
-              </div>
-              <TrendingUp className="h-8 w-8 text-blue-600" />
-            </div>
-
-            <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-              <div>
-                <p className="text-xs text-muted-foreground">Cliente por Rep</p>
-                <p className="text-2xl font-bold">
-                  {Math.round(mockMetrics.totalActiveClients / mockMetrics.totalRepresentatives)}
-                </p>
-              </div>
-              <Users className="h-8 w-8 text-green-600" />
-            </div>
-
-            <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
-              <div>
-                <p className="text-xs text-muted-foreground">Taxa Conversão</p>
-                <p className="text-2xl font-bold">
-                  {((mockMetrics.totalActiveClients / 1500) * 100).toFixed(0)}%
-                </p>
-              </div>
-              <div className="h-8 w-8 rounded-full bg-purple-200 flex items-center justify-center">
-                <span className="text-purple-600 font-bold">%</span>
-              </div>
             </div>
           </CardContent>
         </Card>

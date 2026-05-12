@@ -102,7 +102,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         </SidebarHeader>
 
         <SidebarContent className="gap-0 py-6">
-          <SidebarMenu className="gap-2 px-2 bg-gradient-to-b from-green-200 to-green-100 rounded-lg p-3 mx-2">
+          <SidebarMenu className="gap-2 px-2">
             {menuItems.map((item) => {
               const isActive = location === item.path;
               return (
